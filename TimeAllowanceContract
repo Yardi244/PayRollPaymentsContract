@@ -1,0 +1,106 @@
+//SPDX-License-Identifier: MIT
+pragma solidity ^0.8.7;
+
+contract PayRollContract {
+    //Owner address 
+    address owner;
+
+    event LogEmployeeFundsReceived(address addr, uint amount, uint contractBalance);
+    
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+// Struct allows mutiple value in a variable 
+// define employee
+//All time in solidity is uint 
+    struct Employee {
+        address payable walletAddress ;
+        string firstName;
+        string lastName;
+        uint last4ofSocial;
+        uint releaseTime; 
+        uint amount;
+        bool canWithdraw;
+    }
+
+
+    // use modifier 
+    modifier onlyOwner(){
+        require(msg.sender == owner, "Only owner can add employees");
+        _;
+    }
+
+
+   // create ARRAY to allows multiple employees, put mutiple employees
+    Employee[] public employees;
+
+    //function increment(uint x) returns(uint) {
+        //x++;
+        //return x;
+
+
+    // Function (add Employee) allows to Add Employees * 
+
+        function addEmployee(address payable walletAddress, string memory firstName, string memory lastName, uint last4ofSocial,uint releaseTime, uint amount, bool canWithdraw) public onlyOwner{
+            employees.push(Employee( 
+                walletAddress,
+                firstName,
+                lastName,
+                last4ofSocial,
+                releaseTime,
+                amount,
+                canWithdraw
+            ));
+        }
+
+        function balanceOf() public view returns (uint) {
+            return address(this).balance;
+        }
+        /// Dont use loop for Large companies... Consume alot of gas 
+        function addToEmployeeBalance(address walletAddress) private {
+            for (uint i= 0; i < employees.length; i++){
+                if(employees[i].walletAddress == walletAddress){
+                    employees[i].amount += msg.value;
+                    emit LogEmployeeFundsReceived(walletAddress, msg.value, balanceOf());
+                }
+            }
+        }
+        // deposit funds to specific employee
+        function deposit (address walletAddress) payable public {
+            addToEmployeeBalance(walletAddress);
+        }
+
+        function getIndex(address walletAddress) view private returns(uint){
+            for(uint i = 0; i < employees.length; i++){
+                 require(block.timestamp > employees[i].releaseTime, "You cant withdrawl yet");
+                if(employees[i].walletAddress == walletAddress){
+                    return i;
+                }
+            }
+            return 1000;
+        }
+    // check if able to withdraw 
+        function availableToWithdraw (address walletAddress) public returns(bool){
+            uint i = getIndex(walletAddress);
+            //require block.time to be greater than releaseTime 
+            require(block.timestamp > employees[i].releaseTime, "You can't withdraw yet");
+            if(block.timestamp > employees[i].releaseTime) {
+                employees[i].canWithdraw = true;
+            } else {
+                return false;
+            }
+        }
+
+            function withdraw (address walletAddress) payable public {
+                uint i = getIndex(walletAddress);
+                require(msg.sender == employees[i].walletAddress, "Must be the employee to withdraw");
+                require(employees[i].canWithdraw ==true, "You're not able to withdraw at the time");
+                employees[i].walletAddress.transfer(employees[i].amount);
+            }
+
+        }
+
+
+
